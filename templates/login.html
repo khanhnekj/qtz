@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌸 {{ 'Đăng nhập' if mode == 'login' else 'Đăng ký' }} — Quests Fast Multi</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #fff0f5 0%, #ffe4e9 50%, #fce7f3 100%);
+        }
+        .auth-card {
+            background: #ffffff;
+            border: 1px solid #ffd6e7;
+            border-radius: 24px;
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(255, 133, 162, 0.2);
+            animation: fadeUp 0.5s ease;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .auth-logo h1 {
+            font-size: 1.9em;
+            background: linear-gradient(135deg, #ff85a2, #ff5e8e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .auth-logo p {
+            color: #b08a96;
+            font-size: 0.9em;
+        }
+        .auth-form .form-group {
+            margin-bottom: 16px;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .auth-form label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #c89ba9;
+        }
+        .auth-form input {
+            width: 100%;
+            background: #fff5f8;
+            border: 2px solid #ffd6e7;
+            border-radius: 14px;
+            padding: 13px 16px;
+            color: #7d5a65;
+            font-size: 0.95em;
+            outline: none;
+            transition: all 0.3s;
+            font-family: 'Quicksand', sans-serif;
+        }
+        .auth-form input:focus {
+            border-color: #ff85a2;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(255, 133, 162, 0.15);
+        }
+        .auth-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #ff85a2, #ff5e8e);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 14px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            box-shadow: 0 6px 20px rgba(255, 94, 142, 0.35);
+            transition: all 0.2s;
+            font-family: 'Quicksand', sans-serif;
+        }
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 94, 142, 0.45);
+        }
+        .auth-switch {
+            text-align: center;
+            margin-top: 22px;
+            font-size: 0.9em;
+            color: #b08a96;
+        }
+        .auth-switch a {
+            color: #ff5e8e;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .auth-switch a:hover { text-decoration: underline; }
+        .alert {
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .alert-error {
+            background: #fff0f5;
+            color: #ff5e8e;
+            border: 1px solid #ffd6e7;
+        }
+        .alert-success {
+            background: #e6fffa;
+            color: #38b2ac;
+            border: 1px solid #b2f5ea;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+        <div class="auth-logo">
+            <h1>🌸 Quests Fast Multi</h1>
+            <p>{{ 'Chào mừng trở lại!' if mode == 'login' else 'Tạo tài khoản mới' }}</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">❌ {{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="alert alert-success">✅ {{ success }}</div>
+        {% endif %}
+
+        {% if mode == 'login' %}
+        <form class="auth-form" method="POST" action="/login">
+            <div class="form-group">
+                <label>Tên đăng nhập</label>
+                <input type="text" name="username" placeholder="admin" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Mật khẩu</label>
+                <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="auth-btn">Đăng nhập 💖</button>
+        </form>
+        <div class="auth-switch">
+            Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
+        </div>
+        {% else %}
+        <form class="auth-form" method="POST" action="/register">
+            <div class="form-group">
+                <label>Tên đăng nhập</label>
+                <input type="text" name="username" placeholder="tên đăng nhập" required minlength="3" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Tên hiển thị</label>
+                <input type="text" name="display_name" placeholder="Tên đẹp của bạn" autocomplete="nickname">
+            </div>
+            <div class="form-group">
+                <label>Mật khẩu</label>
+                <input type="password" name="password" placeholder="ít nhất 6 ký tự" required minlength="6" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label>Xác nhận mật khẩu</label>
+                <input type="password" name="confirm" placeholder="nhập lại mật khẩu" required minlength="6" autocomplete="new-password">
+            </div>
+            <button type="submit" class="auth-btn">Đăng ký ✨</button>
+        </form>
+        <div class="auth-switch">
+            Đã có tài khoản? <a href="/login">Đăng nhập</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

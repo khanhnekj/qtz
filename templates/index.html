@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌸 Quests Fast Multi — QKhanhZ</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div>
+                    <h1>🌸 Quests Fast Multi 🌸</h1>
+                    <p class="subtitle">Discord Quest Auto-Completer — By QKhanhZ</p>
+                </div>
+                <div class="user-bar">
+                    <span class="user-badge" id="user-badge">
+                        {% if user %}
+                        {{ user.display_name }}
+                        {% if user.role == 'admin' %}<span class="admin-tag">ADMIN</span>{% endif %}
+                        {% endif %}
+                    </span>
+                    <a href="/logout" class="logout-btn" title="Đăng xuất">Đăng xuất</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat" id="selected-stat-box" style="background: #fff0f5; border-color: #ff85a2;">
+                <span class="stat-label" id="selected-stat-label">Tổng đã xong</span>
+                <span class="stat-value" id="selected-stat-value" style="color: #ff5e8e;">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Uptime</span>
+                <span class="stat-value" id="uptime">0m 0s</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Accounts</span>
+                <span class="stat-value" id="account-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Active Tasks</span>
+                <span class="stat-value" id="total-active">0</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Thêm Token (chỉ hiện với admin) -->
+            <div class="card" id="add-token-card" style="display:none;">
+                <h2>➕ Thêm Token</h2>
+                <div class="form-group">
+                    <input type="text" id="token-input" placeholder="Dán Discord Token vào đây nha..." autocomplete="off">
+                    <button id="add-btn" onclick="addToken()">Add 💖</button>
+                </div>
+                <div id="add-msg" class="msg"></div>
+            </div>
+
+            <div class="card" id="token-list-card">
+                <h2>🔑 Danh sách Token <button id="show-all-btn" onclick="clearFilter()">Hiện tất cả</button></h2>
+                <div id="token-list" class="token-list">
+                    <p class="empty">Chưa có token nào nè...</p>
+                </div>
+            </div>
+
+            <div class="card full-width">
+                <h2>
+                    <span>🔄 Task đang chạy <span id="filter-indicator" class="filter-tag"></span></span>
+                </h2>
+                <div id="task-list" class="task-list">
+                    <p class="empty">Đang chờ quest nè...</p>
+                </div>
+            </div>
+
+            <div class="card full-width">
+                <h2>
+                    <span>📋 Nhật ký <span id="filter-indicator-log" class="filter-tag"></span></span>
+                </h2>
+                <div id="log-box" class="log-box"></div>
+            </div>
+
+            <!-- Music Player -->
+            <div class="card full-width music-card">
+                <h2>🎵 Nhạc nền SoundCloud</h2>
+                <div class="music-player">
+                    <div id="player-area">
+                        <p class="empty" id="no-track-msg">Chưa có bài hát nào. {% if user and user.role == 'admin' %}Admin hãy thêm link bên dưới nha!{% else %}Chờ admin thêm nhạc nhé 💕{% endif %}</p>
+                        <iframe id="sc-player" width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
+                            style="display:none; border-radius: 12px;"></iframe>
+                    </div>
+
+                    <div class="playlist" id="playlist">
+                        <!-- filled by JS -->
+                    </div>
+
+                    {% if user and user.role == 'admin' %}
+                    <div class="add-music-form">
+                        <h3>➕ Thêm bài hát (chỉ Admin)</h3>
+                        <div class="form-group">
+                            <input type="text" id="music-url" placeholder="https://soundcloud.com/...">
+                            <input type="text" id="music-title" placeholder="Tên bài hát (tuỳ chọn)" style="max-width:180px;">
+                            <button onclick="addMusic()">Thêm 🎶</button>
+                        </div>
+                        <div id="music-msg" class="msg"></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Made with 💕 by QKhanhZ — Deploy on Render.com</p>
+        </footer>
+    </div>
+
+<script>
+let selectedUser = null;
+let currentUser = null;
+let tracks = [];
+let currentTrackId = null;
+
+// ─── Auth check ──────────────────────────────────────────────
+async function checkAuth() {
+    try {
+        const res = await fetch('/api/me');
+        if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+        }
+        currentUser = await res.json();
+        // Hiện form thêm token nếu là admin
+        if (currentUser.role === 'admin') {
+            document.getElementById('add-token-card').style.display = 'block';
+        }
+    } catch (e) {
+        window.location.href = '/login';
+    }
+}
+
+// ─── Token functions ─────────────────────────────────────────
+async function addToken() {
+    const input = document.getElementById('token-input');
+    const msg = document.getElementById('add-msg');
+    const token = input.value.trim();
+    if (!token) { msg.textContent = 'Vui lòng nhập token nha.'; msg.className = 'msg error'; return; }
+
+    const btn = document.getElementById('add-btn');
+    btn.disabled = true; btn.textContent = 'Đang thêm...';
+    msg.textContent = '';
+
+    try {
+        const res = await fetch('/api/tokens', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token})
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (res.ok) {
+            msg.textContent = '✅ ' + (data.message || 'Thành công rồi!'); msg.className = 'msg success';
+            input.value = '';
+            loadTokens();
+        } else {
+            msg.textContent = '❌ ' + (data.error || 'Lỗi rồi nè'); msg.className = 'msg error';
+        }
+    } catch(e) {
+        msg.textContent = '❌ Lỗi mạng kìa'; msg.className = 'msg error';
+    }
+    btn.disabled = false; btn.textContent = 'Add 💖';
+}
+
+async function removeToken(token, event) {
+    event.stopPropagation();
+    if (!confirm('Bạn có chắc muốn xóa token này không?')) return;
+    const res = await fetch('/api/tokens', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token})
+    });
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    if (res.status === 403) {
+        alert('Chỉ Admin mới được xóa token!');
+        return;
+    }
+    if (selectedUser) {
+        const r = await fetch('/api/tokens');
+        const tokens = await r.json();
+        if (!tokens.find(t => t.username === selectedUser)) {
+            selectedUser = null;
+        }
+    }
+    loadTokens();
+    loadStatus();
+    loadLogs();
+}
+
+function selectUser(username) {
+    if (selectedUser === username) {
+        selectedUser = null;
+    } else {
+        selectedUser = username;
+    }
+    loadTokens();
+    loadStatus();
+    loadLogs();
+}
+
+function clearFilter() {
+    selectedUser = null;
+    loadTokens();
+    loadStatus();
+    loadLogs();
+}
+
+async function loadTokens() {
+    try {
+        const res = await fetch('/api/tokens');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const tokens = await res.json();
+        const list = document.getElementById('token-list');
+
+        const statusRes = await fetch('/api/status');
+        const statusData = await statusRes.json();
+
+        if (tokens.length === 0) {
+            list.innerHTML = '<p class="empty">Chưa có token nào nè...</p>';
+            return;
+        }
+
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        list.innerHTML = tokens.map(t => {
+            const acc = statusData.accounts.find(a => a.username === t.username) || {completed: 0, active_tasks: 0};
+            const isActive = selectedUser === t.username;
+            return `
+            <div class="token-item ${isActive ? 'active' : ''}" onclick="selectUser('${t.username.replace(/'/g, "\\'")}')">
+                <div class="token-info">
+                    <div class="token-user">${t.username} ${isActive ? '👀' : ''}</div>
+                    <div class="token-masked">${t.masked}</div>
+                    <div class="token-stats">
+                        <span class="badge pink">✓ ${acc.completed}</span>
+                        <span class="badge purple">⏳ ${acc.active_tasks}</span>
+                    </div>
+                </div>
+                ${isAdmin ? `<button class="del-btn" onclick="removeToken('${t.full.replace(/'/g, "\\'")}', event)">✕</button>` : ''}
+            </div>
+            `;
+        }).join('');
+    } catch(e) {}
+}
+
+async function loadStatus() {
+    try {
+        const res = await fetch('/api/status');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+
+        const uptime = data.uptime;
+        document.getElementById('uptime').textContent = `${Math.floor(uptime/60)}m ${uptime%60}s`;
+        document.getElementById('account-count').textContent = data.accounts.length;
+        document.getElementById('total-active').textContent = data.total_active;
+
+        const selectedLabel = document.getElementById('selected-stat-label');
+        const selectedValue = document.getElementById('selected-stat-value');
+
+        if (selectedUser) {
+            const accData = data.accounts.find(a => a.username === selectedUser);
+            if (accData) {
+                selectedLabel.textContent = `${selectedUser} đã xong`;
+                selectedValue.textContent = accData.completed;
+            }
+        } else {
+            selectedLabel.textContent = 'Tổng đã xong';
+            selectedValue.textContent = data.total_completed;
+        }
+
+        const taskList = document.getElementById('task-list');
+        const filterTag = document.getElementById('filter-indicator');
+        let tasks = data.tasks;
+        if (selectedUser) {
+            tasks = tasks.filter(t => t.username === selectedUser);
+            filterTag.textContent = `Đang lọc: ${selectedUser}`;
+            filterTag.style.display = 'inline-block';
+        } else { filterTag.style.display = 'none'; }
+
+        if (tasks.length === 0) {
+            taskList.innerHTML = `<p class="empty">${selectedUser ? 'Không có task nào đang chạy cho bé này.' : 'Đang chờ quest nè...'}</p>`;
+        } else {
+            taskList.innerHTML = tasks.map(t => `
+                <div class="task-item">
+                    <div class="task-info">
+                        <span class="task-user">${t.username}</span>
+                        <span class="task-name">${t.name}</span>
+                    </div>
+                    <div class="task-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width:${t.percent}%"></div>
+                        </div>
+                        <span class="progress-text">${t.current}/${t.total}s (${t.percent}%)</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+}
+
+async function loadLogs() {
+    try {
+        const res = await fetch('/api/logs');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const logs = await res.json();
+        const box = document.getElementById('log-box');
+        const filterTag = document.getElementById('filter-indicator-log');
+
+        let displayLogs = logs;
+        if (selectedUser) {
+            displayLogs = logs.filter(l => l.username === selectedUser);
+            filterTag.textContent = `Đang lọc: ${selectedUser}`;
+            filterTag.style.display = 'inline-block';
+        } else { filterTag.style.display = 'none'; }
+
+        box.innerHTML = displayLogs.map(l => {
+            const cls = `log-${l.level}`;
+            return `<div class="log-line ${cls}"><span class="log-time">${l.time}</span> ${l.msg}</div>`;
+        }).join('');
+        box.scrollTop = box.scrollHeight;
+    } catch(e) {}
+}
+
+// ─── Music ───────────────────────────────────────────────────
+function getEmbedUrl(url) {
+    // SoundCloud oEmbed-style player
+    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5e8e&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+}
+
+function playTrack(id, url) {
+    currentTrackId = id;
+    const iframe = document.getElementById('sc-player');
+    const noMsg = document.getElementById('no-track-msg');
+    iframe.src = getEmbedUrl(url);
+    iframe.style.display = 'block';
+    noMsg.style.display = 'none';
+    renderPlaylist();
+}
+
+async function loadMusic() {
+    try {
+        const res = await fetch('/api/music');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        tracks = data.tracks || [];
+        renderPlaylist();
+        if (tracks.length > 0 && !currentTrackId) {
+            playTrack(tracks[0].id, tracks[0].url);
+        }
+    } catch(e) {}
+}
+
+function renderPlaylist() {
+    const el = document.getElementById('playlist');
+    if (tracks.length === 0) {
+        el.innerHTML = '';
+        document.getElementById('sc-player').style.display = 'none';
+        document.getElementById('no-track-msg').style.display = 'block';
+        return;
+    }
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    el.innerHTML = tracks.map(t => `
+        <div class="track-item ${currentTrackId === t.id ? 'playing' : ''}" onclick="playTrack('${t.id}', '${t.url.replace(/'/g, "\\'")}')">
+            <div class="track-info">
+                <span class="track-title">${t.title}</span>
+                <span class="track-url">${t.url.replace('https://', '').slice(0, 50)}...</span>
+            </div>
+            ${isAdmin ? `<button class="del-btn" onclick="deleteMusic('${t.id}', event)">✕</button>` : ''}
+        </div>
+    `).join('');
+}
+
+async function addMusic() {
+    const url = document.getElementById('music-url').value.trim();
+    const title = document.getElementById('music-title').value.trim();
+    const msg = document.getElementById('music-msg');
+    if (!url) { msg.textContent = 'Nhập link SoundCloud nha'; msg.className = 'msg error'; return; }
+
+    try {
+        const res = await fetch('/api/music', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url, title})
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (res.ok) {
+            msg.textContent = '✅ Đã thêm bài hát!'; msg.className = 'msg success';
+            document.getElementById('music-url').value = '';
+            document.getElementById('music-title').value = '';
+            loadMusic();
+        } else {
+            msg.textContent = '❌ ' + (data.error || 'Lỗi'); msg.className = 'msg error';
+        }
+    } catch(e) {
+        msg.textContent = '❌ Lỗi mạng'; msg.className = 'msg error';
+    }
+}
+
+async function deleteMusic(id, event) {
+    event.stopPropagation();
+    if (!confirm('Xóa bài hát này?')) return;
+    const res = await fetch(`/api/music/${id}`, {method: 'DELETE'});
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    if (res.ok) {
+        if (currentTrackId === id) currentTrackId = null;
+        loadMusic();
+    }
+}
+
+// ─── Init ────────────────────────────────────────────────────
+(async () => {
+    await checkAuth();
+    loadTokens();
+    loadStatus();
+    loadLogs();
+    loadMusic();
+})();
+
+setInterval(loadStatus, 2000);
+setInterval(loadLogs, 2000);
+
+document.getElementById('token-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') addToken();
+});
+</script>
+</body>
+</html>
